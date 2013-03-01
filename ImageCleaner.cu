@@ -1,36 +1,8 @@
 
 #include "ImageCleaner.h"
 
-//YOU CAN CHANGE THESE TO MATCH YOUR IMAGE SIZE
-#define SIZEX    512
-#define SIZEY    512
-
-//----------------------------------------------------------------
-// TODO:  CREATE NEW KERNELS HERE.  YOU CAN PLACE YOUR CALLS TO
-//        THEM IN THE INDICATED SECTION INSIDE THE 'filterImage'
-//        FUNCTION.
-//
-// BEGIN ADD KERNEL DEFINITIONS
-//----------------------------------------------------------------
-
-// This is an example kernel defintion that you should consider using
-__global__ void exampleKernel(float *real_image, float *imag_image, int size_x, int size_y)
-{
-  // Currently does nothing
-}
-
-//----------------------------------------------------------------
-// END ADD KERNEL DEFINTIONS
-//----------------------------------------------------------------
-
 __host__ float filterImage(float *real_image, float *imag_image, int size_x, int size_y)
 {
-  // check that the sizes match up
-  assert(size_x == SIZEX);
-  assert(size_y == SIZEY);
-
-  int matSize = size_x * size_y * sizeof(float);
-
   // These variables are for timing purposes
   float transferDown = 0, transferUp = 0, execution = 0;
   cudaEvent_t start,stop;
@@ -42,17 +14,21 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaStreamCreate(&filterStream));
 
   // Alloc space on the device
-  float *device_real, *device_imag;
-  CUDA_ERROR_CHECK(cudaMalloc((void**)&device_real, matSize));
-  CUDA_ERROR_CHECK(cudaMalloc((void**)&device_imag, matSize));
+
+  unsigned int eight = size_y / 8;
+  unsigned int eight7 = size_y - eight;
+  cufftHandle plan;
+  cufftComplex *data;
+  cufftPlan2d(&plan, size_x, size_y, CUFFT_C2C);
+  CUDA_ERROR_CHECK(cudaMalloc((void**) &data, sizeof(cufftComplex) * size_x * size_y));
 
   // Start timing for transfer down
   CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
   
   // Here is where we copy matrices down to the device 
-  CUDA_ERROR_CHECK(cudaMemcpy(device_real,real_image,matSize,cudaMemcpyHostToDevice));
-  CUDA_ERROR_CHECK(cudaMemcpy(device_imag,imag_image,matSize,cudaMemcpyHostToDevice));
-  
+  CUDA_ERROR_CHECK(cudaMemcpy2D(data, sizeof(cufftComplex), real_image, sizeof(float), sizeof(float), size_x * size_y, cudaMemcpyHostToDevice));
+  CUDA_ERROR_CHECK(cudaMemcpy2D(((float*) data) + 1, sizeof(cufftComplex), imag_image, sizeof(float), sizeof(float), size_x * size_y, cudaMemcpyHostToDevice));
+
   // Stop timing for transfer down
   CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
   CUDA_ERROR_CHECK(cudaEventSynchronize(stop));
@@ -78,8 +54,12 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   //    4. Stream to execute kernel on, should always be 'filterStream'
   //
   // Also note that you pass the pointers to the device memory to the kernel call
-  exampleKernel<<<1,128,0,filterStream>>>(device_real,device_imag,size_x,size_y);
-
+  
+  cufftExecC2C(plan, data, data, CUFFT_FORWARD);
+  //Filter
+  CUDA_ERROR_CHECK(cudaMemset2D(data + eight, sizeof(cufftComplex) * size_y, 0, sizeof(cufftComplex) * (eight7 - eight), size_x));
+  CUDA_ERROR_CHECK(cudaMemset2D(data + eight * size_y,  sizeof(cufftComplex) * size_y, 0, sizeof(cufftComplex) * size_y, eight7 - eight));
+  cufftExecC2C(plan, data, data, CUFFT_INVERSE);
 
   //---------------------------------------------------------------- 
   // END ADD KERNEL CALLS
@@ -94,8 +74,12 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
 
   // Here is where we copy matrices back from the device 
-  CUDA_ERROR_CHECK(cudaMemcpy(real_image,device_real,matSize,cudaMemcpyDeviceToHost));
-  CUDA_ERROR_CHECK(cudaMemcpy(imag_image,device_imag,matSize,cudaMemcpyDeviceToHost));
+  CUDA_ERROR_CHECK(cudaMemcpy2D(real_image, sizeof(float), data, sizeof(cufftComplex), sizeof(float), size_x * size_y, cudaMemcpyDeviceToHost));
+  CUDA_ERROR_CHECK(cudaMemcpy2D(imag_image, sizeof(float), ((float*) data) + 1, sizeof(cufftComplex), sizeof(float), size_x * size_y, cudaMemcpyDeviceToHost));
+  for (int i = 0; i < size_x * size_y; i++) {
+    real_image[i] /= size_x * size_y;
+    imag_image[i] /= size_x * size_y;
+  }
 
   // Finish timing for transfer up
   CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
@@ -111,8 +95,8 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaEventDestroy(stop));
 
   // Free the memory
-  CUDA_ERROR_CHECK(cudaFree(device_real));
-  CUDA_ERROR_CHECK(cudaFree(device_imag));
+  CUDA_ERROR_CHECK(cudaFree(data));
+  cufftDestroy(plan);
 
   // Dump some usage statistics
   printf("CUDA IMPLEMENTATION STATISTICS:\n");

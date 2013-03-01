@@ -6,9 +6,9 @@ DEBUG = 1
 # Note that if you want to run on your own machine you may have to
 # change the NVCCFLAGS to be an earlier streaming multiprocessor version
 # Replacing 20 with 12 or 13 will most likely work
-NVCCFLAGS   = -arch=compute_20 
+NVCCFLAGS   = -m64 -arch=compute_20 
 ifdef DEBUG
-NVCCFLAGS   += -g #-G
+NVCCFLAGS   += -g -G
 else
 NVCCFLAGS   +=
 endif
@@ -21,6 +21,7 @@ else
 CUDA_HOME = /Developer/NVIDIA/CUDA-5.0
 endif
 
+GCCFLAGS    = -arch x86_64
 ifdef DEBUG
 GCCFLAGS    += -g
 else
@@ -28,7 +29,7 @@ GCCFLAGS    +=
 endif
 
 all: main.o ImageCleaner.o JPEGWriter.o CpuReference.o
-	nvcc -L $(CUDA_HOME)/lib -lcudart -ljpeg -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o
+	nvcc $(NVCCFLAGS) -L $(CUDA_HOME)/lib -lcufft -lcudart -ljpeg -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o
 
 main.o: main.cc
 	g++ -I $(CUDA_HOME)/include -c -o main.o main.cc $(GCCFLAGS)
