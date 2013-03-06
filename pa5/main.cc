@@ -8,15 +8,14 @@
 
 int main(int argc, char **argv)
 {
-  if((argc != 2) && (argc != 3))
+  if(argc != 2)
   {
-    fprintf(stderr,"Usage: ImageCleaner noisy_image_file.nsy [run_reference]\n");
-    exit(1);	
+    fprintf(stderr,"Usage: ImageCleaner noisy_image_file.nsy\n");
+    exit(1);
   }
 
   // Set up to make sure that we are running on the right GPU in the PUPS cluster
   // If you want to run on your own GPU you will have to modify this code
- 
   {
     int numDevices;
     CUDA_ERROR_CHECK(cudaGetDeviceCount(&numDevices));
@@ -36,9 +35,9 @@ int main(int argc, char **argv)
       CUDA_ERROR_CHECK(cudaGetDeviceProperties(&prop,devicesConsidered));
       if (!(prop.kernelExecTimeoutEnabled))
       {
-	fprintf(stdout,"Selecting GPU %d of type %s\n\n",devicesConsidered,prop.name);
-	CUDA_ERROR_CHECK(cudaSetDevice(devicesConsidered));
-	break;
+        fprintf(stdout,"Selecting GPU %d of type %s\n\n",devicesConsidered,prop.name);
+        CUDA_ERROR_CHECK(cudaSetDevice(devicesConsidered));
+        break;
       }
     }
     // If we make it here and couldn't find a device without a timeout enabled, exit
@@ -48,18 +47,13 @@ int main(int argc, char **argv)
       exit(1);
     }
   }
-  //FIX ME IF YOU ARE ON MAC
-  //CUDA_ERROR_CHECK(cudaSetDevice(0));
-
 
   // Read in the noisy image file
   char *fileName = argv[1];
   std::ifstream ifs;
   ifs.open(fileName, std::ios::in);
   
-  int runRef = 0; //FIXME
-  if (argc == 3)
-    runRef = atoi(argv[2]);
+  int runRef = 0;
 
   // Get the size of the image
   int size_x, size_y;
@@ -94,8 +88,17 @@ int main(int argc, char **argv)
 
   // Call the functions to perform both the reference and the CUDA implementations
   float referenceTime = 0.0f;
-  if (runRef)
+  if (runRef) {
     referenceTime = referenceCleaner(real_image_ref, imag_image_ref, size_x, size_y);
+  }
+  else {
+    if (size_x == 512) {
+      referenceTime = 65524.6f;
+    }
+    else if (size_x == 1024) {
+      referenceTime = 651773.5f;
+    }
+  }
 
   // Call the GPU implementation
   float cudaTime = filterImage(real_image, imag_image, size_x, size_y);

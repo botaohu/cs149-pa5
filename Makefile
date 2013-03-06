@@ -20,7 +20,7 @@ CUDA_HOME = /usr/local/cuda
 CUDA_LIB = $(CUDA_HOME)/lib64
 else
 CUDA_HOME = /Developer/NVIDIA/CUDA-5.0
-CUDA_LIB = $(CUDA_HOME)/lib
+CUDA_LIB = $(CUDA_LIB)/lib
 endif
 
 GCCFLAGS    = #-arch x86_64
