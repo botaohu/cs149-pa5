@@ -6,7 +6,7 @@
 #include <assert.h>
 #include "cuda.h"
 #include "cuda_runtime.h"
-#include "cufft.h"
+
 
 // A macro for checking the error codes of cuda runtime calls
 #define CUDA_ERROR_CHECK(expr) \

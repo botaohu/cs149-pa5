@@ -1,49 +1,69 @@
+DEBUG ?= 1
 
-# Comment out the following line to generate release code
-DEBUG = 1
+SIZEX ?= 1024
+SIZEY ?= 1024
+CUFFT ?= 0
 
-# If you want to run cuda-gdb uncomment the -G option in the cuda debug options below
-# Note that if you want to run on your own machine you may have to
-# change the NVCCFLAGS to be an earlier streaming multiprocessor version
-# Replacing 20 with 12 or 13 will most likely work
-NVCCFLAGS   = -m64 #-arch=compute_20 
-ifdef DEBUG
-NVCCFLAGS   += -g -G
-else
-NVCCFLAGS   +=
-endif
+OBJECTS = main.o ImageCleaner.o JPEGWriter.o CpuReference.o
 
-UNAME := $(shell uname)
-
-ifeq ($(UNAME), Linux)
+ifeq ($(shell uname), Linux)
 CUDA_HOME = /usr/local/cuda
 CUDA_LIB = $(CUDA_HOME)/lib64
+CUDA_INC = $(CUDA_HOME)/include
 else
 CUDA_HOME = /Developer/NVIDIA/CUDA-5.0
-CUDA_LIB = $(CUDA_LIB)/lib
+CUDA_LIB = $(CUDA_HOME)/lib
+CUDA_INC = $(CUDA_HOME)/include
 endif
 
-GCCFLAGS    = #-arch x86_64
-ifdef DEBUG
-GCCFLAGS    += -g
+NVCCFLAGS = -arch=compute_20 -code=sm_20 -Xptxas "-v" -D SIZEX=$(SIZEX) -D SIZEY=$(SIZEY)
+ifeq ($(DEBUG),1)
+NVCCFLAGS += -g -G
 else
-GCCFLAGS    +=
+NVCCFLAGS += 
 endif
 
-all: main.o ImageCleaner.o JPEGWriter.o CpuReference.o
-	nvcc $(NVCCFLAGS) -L $(CUDA_LIB) -lcufft -lcudart -ljpeg -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o
+ifeq ($(shell uname), Darwin)
+NVCCFLAGS += -m64
+endif
+
+NVCCLDFLAGS = -L $(CUDA_LIB)
+NVCCLIBS = -lcudart -ljpeg
+
+
+CFLAGS = -I $(CUDA_INC) -D SIZEX=$(SIZEX) -D SIZEY=$(SIZEY)
+ifeq ($(DEBUG),1)
+CFLAGS += -g
+else
+CFLAGS +=
+endif
+
+ifeq ($(shell uname), Darwin)
+CFLAGS += -arch x86_64 
+endif
+
+ifeq ($(CUFFT), 1)
+NVCCLIBS += -lcufft
+CFLAGS += -D CUFFT=$(CUFFT)
+NVCCFLAGS += -D CUFFT=$(CUFFT)
+endif
+
+.PHONY: all
+all: $(OBJECTS)
+	nvcc $(NVCCFLAGS) $(NVCCLDFLAGS) -o ImageCleaner $(OBJECTS) $(NVCCLIBS)
 
 main.o: main.cc
-	g++ -I $(CUDA_HOME)/include -c -o main.o main.cc $(GCCFLAGS)
+	g++ $(CFLAGS) -c -o main.o main.cc
 
 ImageCleaner.o: ImageCleaner.cu
-	nvcc -c -o ImageCleaner.o ImageCleaner.cu $(NVCCFLAGS)
+	nvcc $(NVCCFLAGS) -c -o ImageCleaner.o ImageCleaner.cu
 
 JPEGWriter.o: JPEGWriter.cc
-	g++ -c -o JPEGWriter.o JPEGWriter.cc $(GCCFLAGS)
+	g++ $(CFLAGS) -c -o JPEGWriter.o JPEGWriter.cc
 
 CpuReference.o: CpuReference.cc
-	g++ -c -o CpuReference.o CpuReference.cc $(GCCFLAGS)
+	g++ $(CFLAGS) -c -o CpuReference.o CpuReference.cc
 
+.PHONY: clean
 clean:
 	rm -f *~ *.o *.linkinfo ImageCleaner
