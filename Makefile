@@ -17,11 +17,13 @@ UNAME := $(shell uname)
 
 ifeq ($(UNAME), Linux)
 CUDA_HOME = /usr/local/cuda
+CUDA_LIB = $(CUDA_HOME)/lib64
 else
 CUDA_HOME = /Developer/NVIDIA/CUDA-5.0
+CUDA_LIB = $(CUDA_LIB)/lib
 endif
 
-GCCFLAGS    = -arch x86_64
+GCCFLAGS    = #-arch x86_64
 ifdef DEBUG
 GCCFLAGS    += -g
 else
@@ -29,7 +31,7 @@ GCCFLAGS    +=
 endif
 
 all: main.o ImageCleaner.o JPEGWriter.o CpuReference.o
-	nvcc $(NVCCFLAGS) -L $(CUDA_HOME)/lib -lcufft -lcudart -ljpeg -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o
+	nvcc $(NVCCFLAGS) -L $(CUDA_LIB) -lcufft -lcudart -ljpeg -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o
 
 main.o: main.cc
 	g++ -I $(CUDA_HOME)/include -c -o main.o main.cc $(GCCFLAGS)
