@@ -1,0 +1,48 @@
+rm -f *~ *.o *.linkinfo ImageCleaner
+g++ -I /usr/local/cuda/include -D SIZEX=512 -D SIZEY=512  -c -o main.o main.cc
+nvcc -arch=compute_20 -Xptxas "-v" -D SIZEX=512 -D SIZEY=512  -code=sm_20 -c -o ImageCleaner.o ImageCleaner.cu
+g++ -I /usr/local/cuda/include -D SIZEX=512 -D SIZEY=512  -c -o JPEGWriter.o JPEGWriter.cc
+g++ -I /usr/local/cuda/include -D SIZEX=512 -D SIZEY=512  -c -o CpuReference.o CpuReference.cc
+nvcc -arch=compute_20 -Xptxas "-v" -D SIZEX=512 -D SIZEY=512  -code=sm_20 -L /usr/local/cuda/lib64 -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o -lcudart -ljpeg
+Selecting GPU 0 of type Tesla M2050
+
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 3.018848 ms
+  Kernel(s) Execution Time: 0.687296 ms
+  Device to Host Transfer Time: 3.167104 ms
+  Total CUDA Execution Time: 6.873248 ms
+
+TOTAL SPEEDUP: 9533.280273
+
+Writing out CUDA generated image to images/noisy_01_out.jpg
+
+Selecting GPU 0 of type Tesla M2050
+
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 2.999072 ms
+  Kernel(s) Execution Time: 0.675808 ms
+  Device to Host Transfer Time: 3.151552 ms
+  Total CUDA Execution Time: 6.826432 ms
+
+TOTAL SPEEDUP: 9598.660156
+
+Writing out CUDA generated image to images/noisy_02_out.jpg
+
+rm -f *~ *.o *.linkinfo ImageCleaner
+g++ -I /usr/local/cuda/include -D SIZEX=1024 -D SIZEY=1024  -c -o main.o main.cc
+nvcc -arch=compute_20 -Xptxas "-v" -D SIZEX=1024 -D SIZEY=1024  -code=sm_20 -c -o ImageCleaner.o ImageCleaner.cu
+g++ -I /usr/local/cuda/include -D SIZEX=1024 -D SIZEY=1024  -c -o JPEGWriter.o JPEGWriter.cc
+g++ -I /usr/local/cuda/include -D SIZEX=1024 -D SIZEY=1024  -c -o CpuReference.o CpuReference.cc
+nvcc -arch=compute_20 -Xptxas "-v" -D SIZEX=1024 -D SIZEY=1024  -code=sm_20 -L /usr/local/cuda/lib64 -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o -lcudart -ljpeg
+Selecting GPU 0 of type Tesla M2050
+
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 11.428384 ms
+  Kernel(s) Execution Time: 2.846336 ms
+  Device to Host Transfer Time: 12.319008 ms
+  Total CUDA Execution Time: 26.593727 ms
+
+TOTAL SPEEDUP: 24508.542969
+
+Writing out CUDA generated image to images/noisy_03_out.jpg
+
