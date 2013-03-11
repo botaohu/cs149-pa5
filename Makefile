@@ -16,7 +16,7 @@ CUDA_LIB = $(CUDA_HOME)/lib
 CUDA_INC = $(CUDA_HOME)/include
 endif
 
-NVCCFLAGS = -arch=compute_20 -code=sm_20 -Xptxas "-v" -D SIZEX=$(SIZEX) -D SIZEY=$(SIZEY)
+NVCCFLAGS = -arch=compute_20 -Xptxas "-v" -D SIZEX=$(SIZEX) -D SIZEY=$(SIZEY)
 ifeq ($(DEBUG),1)
 NVCCFLAGS += -g -G
 else
@@ -24,7 +24,9 @@ NVCCFLAGS +=
 endif
 
 ifeq ($(shell uname), Darwin)
-NVCCFLAGS += -m64
+NVCCFLAGS += -m64 -code=sm_20
+else
+NVCCFLAGS += -code=sm_20
 endif
 
 NVCCLDFLAGS = -L $(CUDA_LIB)
