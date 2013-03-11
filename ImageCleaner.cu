@@ -392,7 +392,7 @@ inline __device__ void transpose4x4( float2 *a, float *s, int ds, float *l, int 
     loady<16>( a, l, dl );  if( sync&1 ) __syncthreads();
 }
 
-__global__ void FFT1024_device( float2 *dst, float2 *src )
+__global__ void FFT1024x_device( float2 *dst, float2 *src )
 { 
     int tid = threadIdx.x;
     
@@ -427,13 +427,56 @@ __global__ void FFT1024_device( float2 *dst, float2 *src )
 
     store<16>( a, dst, 64 );
 }   
-    
-void FFT1024( float2 *work, int batch )
+
+__host__ void FFT1024x( float2 *work, int batch )
 { 
-    FFT1024_device<<< grid2D(batch), 64 >>>( work, work );
+    FFT1024x_device<<< grid2D(batch), 64 >>>( work, work );
+    CUDA_ERROR_CHECK(cudaGetLastError());
 } 
 
-__global__ void IFFT1024_device( float2 *dst, float2 *src )
+__global__ void FFT1024y_device( float2 *dst, float2 *src )
+{ 
+    int tid = threadIdx.x;
+    
+    int iblock = blockIdx.y * gridDim.x + blockIdx.x;
+    int index = iblock + tid * 1024;
+    src += index;
+    dst += index;
+    
+    int hi4 = tid>>4;
+    int lo4 = tid&15;
+    int hi2 = tid>>4;
+    int mi2 = (tid>>2)&3;
+    int lo2 = tid&3;
+
+    float2 a[16];
+    __shared__ float smem[69*16];
+    
+    load<16>( a, src, 64 * 1024 );
+
+    FFT16( a );
+    
+    twiddle<16>( a, tid, 1024 );
+    int il[] = {0,1,2,3, 16,17,18,19, 32,33,34,35, 48,49,50,51};
+    transpose<16>( a, &smem[lo4*65+hi4], 4, &smem[lo4*65+hi4*4], il );
+    
+    FFT4x4( a );
+
+    twiddle4x4( a, lo4 );
+    transpose4x4( a, &smem[hi2*17 + mi2*4 + lo2], 69, &smem[mi2*69*4 + hi2*69 + lo2*17 ], 1, 0xE );
+    
+    FFT16( a );
+
+    store<16>( a, dst, 64 * 1024 );
+}   
+
+__host__ void FFT1024y( float2 *work, int batch )
+{ 
+    FFT1024y_device<<< grid2D(batch), 64 >>>( work, work );
+    CUDA_ERROR_CHECK(cudaGetLastError());
+} 
+
+__global__ void IFFT1024x_device( float2 *dst, float2 *src )
 { 
     int tid = threadIdx.x;
     
@@ -469,24 +512,69 @@ __global__ void IFFT1024_device( float2 *dst, float2 *src )
     store<16>( a, dst, 64 );
 }   
     
-void IFFT1024( float2 *work, int batch )
+__host__ void IFFT1024x( float2 *work, int batch )
 { 
-    IFFT1024_device<<< grid2D(batch), 64 >>>( work, work );
+    IFFT1024x_device<<< grid2D(batch), 64 >>>( work, work );
+    CUDA_ERROR_CHECK(cudaGetLastError());
 } 
 
+__global__ void IFFT1024y_device( float2 *dst, float2 *src )
+{ 
+    int tid = threadIdx.x;
+    
+    int iblock = blockIdx.y * gridDim.x + blockIdx.x;
+    int index = iblock + tid * 1024;
+    src += index;
+    dst += index;
+    
+    int hi4 = tid>>4;
+    int lo4 = tid&15;
+    int hi2 = tid>>4;
+    int mi2 = (tid>>2)&3;
+    int lo2 = tid&3;
 
-__global__ void FFT512_device( float2 *work )
+    float2 a[16];
+    __shared__ float smem[69*16];
+    
+    load<16>( a, src, 64 * 1024 );
+
+    IFFT16( a );
+    
+    itwiddle<16>( a, tid, 1024 );
+    int il[] = {0,1,2,3, 16,17,18,19, 32,33,34,35, 48,49,50,51};
+    transpose<16>( a, &smem[lo4*65+hi4], 4, &smem[lo4*65+hi4*4], il );
+    
+    IFFT4x4( a );
+
+    itwiddle4x4( a, lo4 );
+    transpose4x4( a, &smem[hi2*17 + mi2*4 + lo2], 69, &smem[mi2*69*4 + hi2*69 + lo2*17 ], 1, 0xE );
+    
+    IFFT16( a );
+
+    store<16>( a, dst, 64 * 1024);
+}   
+    
+__host__ void IFFT1024y( float2 *work, int batch )
+{ 
+    IFFT1024y_device<<< grid2D(batch), 64 >>>( work, work );
+    CUDA_ERROR_CHECK(cudaGetLastError());
+}
+
+__global__ void FFT512x_device( float2 *dst, float2 *src )
 { 
     int tid = threadIdx.x;
     int hi = tid>>3;
     int lo = tid&7;
     
-    work += (blockIdx.y * gridDim.x + blockIdx.x) * 512 + tid;
-  
+    int iblock = blockIdx.y * gridDim.x + blockIdx.x;
+    int index = iblock * 512 + tid;
+    src += index;
+    dst += index;
+
     float2 a[8];
     __shared__ float smem[8*8*9];
     
-    load<8>( a, work, 64 );
+    load<8>( a, src, 64 );
 
     FFT8( a );
   
@@ -500,26 +588,67 @@ __global__ void FFT512_device( float2 *work )
     
     FFT8( a );
 
-    store<8>( a, work, 64 );
+    store<8>( a, dst, 64 );
 } 
     
-void FFT512( float2 *work, int batch )
+__host__ void FFT512x( float2 *work, int batch )
 { 
-    FFT512_device<<< grid2D(batch), 64 >>>( work );
+    FFT512x_device<<< grid2D(batch), 64 >>>( work, work );
+    CUDA_ERROR_CHECK(cudaGetLastError());
 } 
 
-__global__ void IFFT512_device( float2 *work )
+__global__ void FFT512y_device( float2 *dst, float2 *src )
 { 
     int tid = threadIdx.x;
     int hi = tid>>3;
     int lo = tid&7;
     
-    work += (blockIdx.y * gridDim.x + blockIdx.x) * 512 + tid;
-  
+    int iblock = blockIdx.y * gridDim.x + blockIdx.x;
+    int index = iblock + tid * 512;
+    src += index;
+    dst += index;
+
     float2 a[8];
     __shared__ float smem[8*8*9];
     
-    load<8>( a, work, 64 );
+    load<8>( a, src, 64 * 512);
+
+    FFT8( a );
+  
+    twiddle<8>( a, tid, 512 );
+    transpose<8>( a, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8 );
+  
+    FFT8( a );
+  
+    twiddle<8>( a, hi, 64);
+    transpose<8>( a, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE );
+    
+    FFT8( a );
+
+    store<8>( a, dst, 64 * 512);
+} 
+    
+__host__ void FFT512y( float2 *work, int batch )
+{ 
+    FFT512y_device<<< grid2D(batch), 64 >>>( work, work );
+    CUDA_ERROR_CHECK(cudaGetLastError());
+} 
+
+__global__ void IFFT512x_device( float2 *dst, float2 *src )
+{ 
+    int tid = threadIdx.x;
+    int hi = tid>>3;
+    int lo = tid&7;
+    
+    int iblock = blockIdx.y * gridDim.x + blockIdx.x;
+    int index = iblock * 512 + tid;
+    src += index;
+    dst += index;
+
+    float2 a[8];
+    __shared__ float smem[8*8*9];
+    
+    load<8>( a, src, 64 );
 
     IFFT8( a );
   
@@ -533,21 +662,71 @@ __global__ void IFFT512_device( float2 *work )
     
     IFFT8( a );
 
-    store<8>( a, work, 64 );
+    store<8>( a, dst, 64 );
 } 
 
-void IFFT512( float2 *work, int batch )
+__host__ void IFFT512x( float2 *work, int batch )
 { 
-    IFFT512_device<<< grid2D(batch), 64 >>>( work );
+    IFFT512x_device<<< grid2D(batch), 64 >>>( work, work );
+    CUDA_ERROR_CHECK(cudaGetLastError());
 } 
 
+__global__ void IFFT512y_device( float2 *dst, float2 *src )
+{ 
+    int tid = threadIdx.x;
+    int hi = tid>>3;
+    int lo = tid&7;
+    
+    int iblock = blockIdx.y * gridDim.x + blockIdx.x;
+    int index = iblock + tid * 512;
+    src += index;
+    dst += index;
+
+    float2 a[8];
+    __shared__ float smem[8*8*9];
+    
+    load<8>( a, src, 64 * 512);
+
+    IFFT8( a );
+  
+    itwiddle<8>( a, tid, 512 );
+    transpose<8>( a, &smem[hi*8+lo], 66, &smem[lo*66+hi], 8 );
+  
+    IFFT8( a );
+  
+    itwiddle<8>( a, hi, 64);
+    transpose<8>( a, &smem[hi*8+lo], 8*9, &smem[hi*8*9+lo], 8, 0xE );
+    
+    IFFT8( a );
+
+    store<8>( a, dst, 64 * 512);
+} 
+
+__host__ void IFFT512y( float2 *work, int batch )
+{ 
+    IFFT512y_device<<< grid2D(batch), 64 >>>( work, work );
+    CUDA_ERROR_CHECK(cudaGetLastError());
+} 
+__host__ void Filter( float2 *work, int size ) 
+{
+  unsigned int eight = size / 8;
+  unsigned int eight7 = size - eight;
+  CUDA_ERROR_CHECK(cudaMemset2D(work + eight, sizeof(float2) * size, 0, sizeof(float2) * (eight7 - eight), size));
+  CUDA_ERROR_CHECK(cudaMemset2D(work + eight * size, sizeof(float2) * size, 0, sizeof(float2) * size, eight7 - eight));
+}
 __host__ void mainKernel(float2 *data, int size) {
   if (size == 512) {
-    FFT512(data, size);
-    IFFT512(data, size);
+    FFT512x(data, size);
+    FFT512y(data, size);
+    Filter(data, size);
+    IFFT512x(data, size);
+    IFFT512y(data, size);
   } else {
-    FFT1024(data, size);
-    IFFT1024(data, size);
+    FFT1024x(data, size);
+    FFT1024y(data, size);
+    Filter(data, size);
+    IFFT1024x(data, size);
+    IFFT1024y(data, size);
   }
 }
 __host__ float filterImage(float *real_image, float *imag_image, int size_x, int size_y)
@@ -610,10 +789,8 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   // Also note that you pass the pointers to the device memory to the kernel call
   
   //precompute the bit reversal.
- 
 
   mainKernel(data, SIZE);
-  CUDA_ERROR_CHECK(cudaGetLastError());
   
   //---------------------------------------------------------------- 
   // END ADD KERNEL CALLS
@@ -630,7 +807,7 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   // Here is where we copy matrices back from the device 
   CUDA_ERROR_CHECK(cudaMemcpy(dataLocal, data, sizeof(float2) * matSize, cudaMemcpyDeviceToHost));
   for (int i = 0; i < matSize; i++) {
-    real_image[i] =  dataLocal[i].x / matSize;
+    real_image[i] = dataLocal[i].x / matSize;
     imag_image[i] = dataLocal[i].y / matSize;
   }
   delete [] dataLocal;

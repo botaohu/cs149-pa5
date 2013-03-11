@@ -24,7 +24,7 @@ NVCCFLAGS +=
 endif
 
 ifeq ($(shell uname), Darwin)
-NVCCFLAGS += -m64 -code=sm_20
+NVCCFLAGS += -m64 
 else
 NVCCFLAGS += -code=sm_20
 endif
