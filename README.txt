@@ -28,23 +28,75 @@ We distribute all rows (or columns) on GPU grid.
 Each block represents one 1D FFT task.
 
 [Performance]
-
 noisy_01:
-Reference Kernel Execution Time: 96293.445312 ms
-Optimized Kernel Execution Time: 41.956001 ms
-Speedup: 2295.11
+
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 3.018848 ms
+  Kernel(s) Execution Time: 0.687296 ms
+  Device to Host Transfer Time: 3.167104 ms
+  Total CUDA Execution Time: 6.873248 ms
+
+TOTAL SPEEDUP: 9533.280273
 
 noisy_02:
-Reference Kernel Execution Time: 96401.265625 ms
-Optimized Kernel Execution Time: 42.112999 ms
-Speedup: 2289.11
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 2.999072 ms
+  Kernel(s) Execution Time: 0.675808 ms
+  Device to Host Transfer Time: 3.151552 ms
+  Total CUDA Execution Time: 6.826432 ms
+
+TOTAL SPEEDUP: 9598.660156
 
 noisy_03:
-Reference Kernel Execution Time: 785200.187500 ms
-Optimized Kernel Execution Time: 202.889008 ms
-Speedup: 3870.1
+
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 11.428384 ms
+  Kernel(s) Execution Time: 2.846336 ms
+  Device to Host Transfer Time: 12.319008 ms
+  Total CUDA Execution Time: 26.593727 ms
+
+TOTAL SPEEDUP: 24508.542969
+
+[Performance of CUFFT]
+We also implement CUFFT-based algorithm for comparison (Cuda build-in library),
+
+noisy_01:
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 3.078112 ms
+  Kernel(s) Execution Time: 0.376640 ms
+  Device to Host Transfer Time: 2.867776 ms
+  Total CUDA Execution Time: 6.322528 ms
+
+TOTAL SPEEDUP: 10363.671875
+
+noisy_02:
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 3.133632 ms
+  Kernel(s) Execution Time: 0.374656 ms
+  Device to Host Transfer Time: 2.910112 ms
+  Total CUDA Execution Time: 6.418400 ms
+
+TOTAL SPEEDUP: 10208.869141
+
+noisy_03:
+CUDA IMPLEMENTATION STATISTICS:
+  Host to Device Transfer Time: 11.517792 ms
+  Kernel(s) Execution Time: 1.379744 ms
+  Device to Host Transfer Time: 11.277120 ms
+  Total CUDA Execution Time: 24.174656 ms
+
+TOTAL SPEEDUP: 26961.025391
 
 [Correctness]
 The result of CpuReference and our method are visually identical.
 The difference between the results are acceptable due to the error of the numerical calculation. 
 
+[Running]
+First execute
+	source run.sh 
+to set up the environment variables.
+Then execute
+	qsub -d$(pwd) pa5.pbs
+If you want to execute CUFFT-based algorithm for comparison (Cuda build-in library),
+then execute
+	qsub -d$(pwd) pa5-cufft.pbs

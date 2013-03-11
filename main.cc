@@ -16,7 +16,6 @@ int main(int argc, char **argv)
 
   // Set up to make sure that we are running on the right GPU in the PUPS cluster
   // If you want to run on your own GPU you will have to modify this code
-  if (1)
   {
     int numDevices;
     CUDA_ERROR_CHECK(cudaGetDeviceCount(&numDevices));
@@ -48,7 +47,6 @@ int main(int argc, char **argv)
       exit(1);
     }
   }
-  cudaSetDevice(0);
 
   // Read in the noisy image file
   char *fileName = argv[1];
