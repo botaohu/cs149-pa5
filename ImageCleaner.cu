@@ -466,7 +466,7 @@ __host__ void Filter(float2 *work, int size) {
   CUDA_ERROR_CHECK(cudaMemset2D(work + eight, sizeof(float2) * size, 0, sizeof(float2) * (eight7 - eight), size));
   CUDA_ERROR_CHECK(cudaMemset2D(work + eight * size, sizeof(float2) * size, 0, sizeof(float2) * size, eight7 - eight));
 }
-__host__ float filterImage(float *real_image, float *imag_image, int size_x, int size_y) {
+__host__ float filterImage(float2* image, int size_x, int size_y) {
   // check that the sizes match up
   assert(size_x == SIZEX);
   assert(size_y == SIZEY);
@@ -493,12 +493,6 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
   
   // Here is where we copy matrices down to the device 
-  //float2 *dataLocal = new float2[matSize];
-  
-  //for (int i = 0; i < matSize; i++) {
-  //  dataLocal[i].x = real_image[i];
-  //  dataLocal[i].y = imag_image[i];
-  //}
  
   // Stop timing for transfer down
   CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
@@ -526,14 +520,13 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   // Also note that you pass the pointers to the device memory to the kernel call
   
   //precompute the bit reversal.
-  CUDA_ERROR_CHECK(cudaMemcpyAsync(data, dataLocal, matSize * sizeof(float2), cudaMemcpyHostToDevice));
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(data, image, matSize * sizeof(float2), cudaMemcpyHostToDevice));
   FFT<SIZE, AXIS_X, FORWARD>(data, size);
   FFT<SIZE, AXIS_Y, FORWARD>(data, size);
   Filter(data, size);
   FFT<SIZE, AXIS_X, INVERSE>(data, size);
   FFT<SIZE, AXIS_Y, INVERSE>(data, size);
-  CUDA_ERROR_CHECK(cudaMemcpyAsync(dataLocal, data, sizeof(float2) * matSize, cudaMemcpyDeviceToHost));
-
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(image, data, sizeof(float2) * matSize, cudaMemcpyDeviceToHost));
 
   //---------------------------------------------------------------- 
   // END ADD KERNEL CALLS
@@ -548,7 +541,6 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
 
   // Here is where we copy matrices back from the device 
- //delete [] dataLocal;
 
   // Finish timing for transfer up
   CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
@@ -565,7 +557,6 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
 
   // Free the memory
   CUDA_ERROR_CHECK(cudaFree(data));
-  memcpy();
 
   // Dump some usage statistics
   printf("CUDA IMPLEMENTATION STATISTICS:\n");
@@ -580,7 +571,7 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
 #else
 #include <cufft.h>
 
-__host__ float filterImage(float *real_image, float *imag_image, int size_x, int size_y)
+__host__ float filterImage(float2 *image, int size_x, int size_y)
 {
   // These variables are for timing purposes
   float transferDown = 0, transferUp = 0, execution = 0;
@@ -605,13 +596,6 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
   
   // Here is where we copy matrices down to the device 
-  cufftComplex *dataLocal = new cufftComplex[size_x * size_y];
-  for (int i = 0; i < size_x * size_y; i++) {
-    dataLocal[i].x = real_image[i];
-    dataLocal[i].y = imag_image[i];
-  }
-  CUDA_ERROR_CHECK(cudaMemcpy(data, dataLocal, sizeof(cufftComplex) * size_x * size_y, cudaMemcpyHostToDevice));
-
 
   // Stop timing for transfer down
   CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
@@ -639,11 +623,13 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   //
   // Also note that you pass the pointers to the device memory to the kernel call
   
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(data, image, sizeof(cufftComplex) * size_x * size_y, cudaMemcpyHostToDevice));
   cufftExecC2C(plan, data, data, CUFFT_FORWARD);
   //Filter
   CUDA_ERROR_CHECK(cudaMemset2D(data + eight, sizeof(cufftComplex) * size_y, 0, sizeof(cufftComplex) * (eight7 - eight), size_x));
   CUDA_ERROR_CHECK(cudaMemset2D(data + eight * size_y,  sizeof(cufftComplex) * size_y, 0, sizeof(cufftComplex) * size_y, eight7 - eight));
   cufftExecC2C(plan, data, data, CUFFT_INVERSE);
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(image, data, sizeof(cufftComplex) * size_x * size_y, cudaMemcpyDeviceToHost));
 
   //---------------------------------------------------------------- 
   // END ADD KERNEL CALLS
@@ -658,10 +644,9 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
 
   // Here is where we copy matrices back from the device 
-  CUDA_ERROR_CHECK(cudaMemcpy(dataLocal, data, sizeof(cufftComplex) * size_x * size_y, cudaMemcpyDeviceToHost));
   for (int i = 0; i < size_x * size_y; i++) {
-    real_image[i] =  dataLocal[i].x / (size_x * size_y);
-    imag_image[i] = dataLocal[i].y / (size_x * size_y);
+    image[i].x /= (size_x * size_y);
+    image[i].y /= (size_x * size_y);
   }
 
   // Finish timing for transfer up

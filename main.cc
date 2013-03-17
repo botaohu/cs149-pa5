@@ -16,6 +16,7 @@ int main(int argc, char **argv)
 
   // Set up to make sure that we are running on the right GPU in the PUPS cluster
   // If you want to run on your own GPU you will have to modify this code
+  if (false) 
   {
     int numDevices;
     CUDA_ERROR_CHECK(cudaGetDeviceCount(&numDevices));
@@ -101,7 +102,17 @@ int main(int argc, char **argv)
   }
 
   // Call the GPU implementation
-  float cudaTime = filterImage(real_image, imag_image, size_x, size_y);
+  int matSize = size_x * size_y;
+  float2 *image = new float2[matSize];
+  for (int i = 0; i < matSize; i++) {
+    image[i].x = real_image[i];
+    image[i].y = imag_image[i];
+  }
+  float cudaTime = filterImage(image, size_x, size_y);
+  for (int i = 0; i < matSize; i++) {
+    real_image[i] = image[i].x;
+    imag_image[i] = image[i].y;
+  }
 
   // Print out the speedup statistic
   printf("TOTAL SPEEDUP: %f\n\n", (referenceTime/cudaTime));
