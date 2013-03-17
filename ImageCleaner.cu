@@ -333,6 +333,11 @@ inline __device__ void transpose4x4(float2 *a, float *s, int ds, float *l, int d
   storey4x4(a, s, ds);  if(sync & 2) __syncthreads();
   loady<16>(a, l, dl);  if(sync & 1) __syncthreads();
 }
+template<int n> inline __device__ void scalar(float2 *a, float f) {
+#pragma unroll
+    for (int i = 0; i < n; i++)
+        a[i] = a[i] * f;
+}
 
 template<int n, Axis axis, Direction dir> struct FFTComputing {
   static __device__ void FFT(float2 *dst, float2 *src, int tid);
@@ -356,6 +361,9 @@ template<Axis axis, Direction dir> struct FFTComputing<256, axis, dir> {
     transpose<16>(a, &s[hi * 17 * 16 + 17 * lo], 1, &s[hi * 17 * 16 + lo], 17, 0);
     
     FFT16<dir>(a);
+
+    if (dir == INVERSE)
+      scalar<16>(a, 1./256);
 
     if (axis == AXIS_X)
       store<16>(a, dst, 16);
@@ -388,6 +396,9 @@ template<Axis axis, Direction dir> struct FFTComputing<512, axis, dir> {
     transpose<8>(a, &s[hi * 8 + lo], 8 * 9, &s[hi * 8 * 9 + lo], 8, 0xE);
     
     FFT8<dir>(a);
+
+    if (dir == INVERSE)
+      scalar<8>(a, 1./512);
 
     if (axis == AXIS_X)
       store<8>(a, dst, 64);
@@ -424,6 +435,9 @@ template<Axis axis, Direction dir> struct FFTComputing<1024, axis, dir> {
     transpose4x4(a, &s[hi2 * 17 + mi2 * 4 + lo2], 69, &s[mi2 * 69 * 4 + hi2 * 69 + lo2 * 17], 1, 0xE);
     
     FFT16<dir>(a);
+
+    if (dir == INVERSE)
+      scalar<16>(a, 1./1024);
 
     if (axis == AXIS_X)
       store<16>(a, dst, 64);
@@ -479,13 +493,13 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
   
   // Here is where we copy matrices down to the device 
-  float2 *dataLocal = new float2[matSize];
-  for (int i = 0; i < matSize; i++) {
-    dataLocal[i].x = real_image[i];
-    dataLocal[i].y = imag_image[i];
-  }
-  CUDA_ERROR_CHECK(cudaMemcpy(data, dataLocal, matSize * sizeof(float2), cudaMemcpyHostToDevice));
+  //float2 *dataLocal = new float2[matSize];
   
+  //for (int i = 0; i < matSize; i++) {
+  //  dataLocal[i].x = real_image[i];
+  //  dataLocal[i].y = imag_image[i];
+  //}
+ 
   // Stop timing for transfer down
   CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
   CUDA_ERROR_CHECK(cudaEventSynchronize(stop));
@@ -512,13 +526,15 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   // Also note that you pass the pointers to the device memory to the kernel call
   
   //precompute the bit reversal.
-
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(data, dataLocal, matSize * sizeof(float2), cudaMemcpyHostToDevice));
   FFT<SIZE, AXIS_X, FORWARD>(data, size);
   FFT<SIZE, AXIS_Y, FORWARD>(data, size);
   Filter(data, size);
   FFT<SIZE, AXIS_X, INVERSE>(data, size);
   FFT<SIZE, AXIS_Y, INVERSE>(data, size);
-  
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(dataLocal, data, sizeof(float2) * matSize, cudaMemcpyDeviceToHost));
+
+
   //---------------------------------------------------------------- 
   // END ADD KERNEL CALLS
   //----------------------------------------------------------------
@@ -532,18 +548,13 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
   CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
 
   // Here is where we copy matrices back from the device 
-  CUDA_ERROR_CHECK(cudaMemcpy(dataLocal, data, sizeof(float2) * matSize, cudaMemcpyDeviceToHost));
-  for (int i = 0; i < matSize; i++) {
-    real_image[i] = dataLocal[i].x / matSize;
-    imag_image[i] = dataLocal[i].y / matSize;
-  }
-  delete [] dataLocal;
+ //delete [] dataLocal;
 
   // Finish timing for transfer up
   CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
   CUDA_ERROR_CHECK(cudaEventSynchronize(stop));
   CUDA_ERROR_CHECK(cudaEventElapsedTime(&transferUp,start,stop));
-
+  
   // Synchronize the stream
   CUDA_ERROR_CHECK(cudaStreamSynchronize(filterStream));
   // Destroy the stream
@@ -554,6 +565,7 @@ __host__ float filterImage(float *real_image, float *imag_image, int size_x, int
 
   // Free the memory
   CUDA_ERROR_CHECK(cudaFree(data));
+  memcpy();
 
   // Dump some usage statistics
   printf("CUDA IMPLEMENTATION STATISTICS:\n");
