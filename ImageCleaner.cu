@@ -436,9 +436,10 @@ template<Axis axis, Direction dir> struct FFTComputing<1024, axis, dir> {
     
     FFT16<dir>(a);
 
+
     if (dir == INVERSE)
       scalar<16>(a, 1./1024);
-
+    
     if (axis == AXIS_X)
       store<16>(a, dst, 64);
     else
@@ -456,8 +457,8 @@ template<int n, Axis axis, Direction dir> __global__ void FFT_device(float2 *dst
     FFTComputing<n, axis, dir>::FFT(dst, src, tid);
 }
 
-template<int n, Axis axis, Direction dir> __host__ void FFT(float2 *data, int batch) {
-    FFT_device<n, axis, dir><<<grid2D(batch), 64>>>(data, data);
+template<int n, Axis axis, Direction dir> __host__ void FFT(float2 *data, int batch, cudaStream_t& stream) {
+    FFT_device<n, axis, dir><<<grid2D(batch), 64, 0, stream>>>(data, data);
     CUDA_ERROR_CHECK(cudaGetLastError());
 }
 __host__ void Filter(float2 *work, int size) {
@@ -466,6 +467,19 @@ __host__ void Filter(float2 *work, int size) {
   CUDA_ERROR_CHECK(cudaMemset2D(work + eight, sizeof(float2) * size, 0, sizeof(float2) * (eight7 - eight), size));
   CUDA_ERROR_CHECK(cudaMemset2D(work + eight * size, sizeof(float2) * size, 0, sizeof(float2) * size, eight7 - eight));
 }
+/*
+template<int n> __global__ void MyFilter_device(float2 *data) {
+    int y = threadIdx.x;
+    int x = blockIdx.x;
+    int index = x * n + y;
+    if (!((x < n / 8 || x >= n - n / 8) && (y < n / 8 || y >= n - n / 8))) {
+      data[index].x = data[index].y = 0;
+    }
+}
+__host__ void MyFilter(float2 *work, int size) {
+  MyFilter_device<n><<<grid2D(size), size, 0, stream>>>(data);
+}
+*/
 __host__ float filterImage(float2* image, int size_x, int size_y) {
   #define PNUM  8
   #define BLOCK (SIZE * SIZE / PNUM)
@@ -504,7 +518,7 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   //CUDA_ERROR_CHECK(cudaEventElapsedTime(&transferDown,start,stop));
 
   // Start timing for the execution
-  CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream[0]));
+  CUDA_ERROR_CHECK(cudaEventRecord(start, filterStream[PNUM - 1]));
 
   //----------------------------------------------------------------
   // TODO: YOU SHOULD PLACE ALL YOUR KERNEL EXECUTIONS
@@ -523,25 +537,35 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   //
   // Also note that you pass the pointers to the device memory to the kernel call
   
-  //precompute the bit reversal.
-  for (int i = 0; i < PNUM; i++) 
-     CUDA_ERROR_CHECK(cudaMemcpyAsync(data + BLOCK * i, image + BLOCK * i, matSize * sizeof(float2) / PNUM, cudaMemcpyHostToDevice));
-  
-  CUDA_ERROR_CHECK(cudaMemcpyAsync(data, image, sizeof(float2) * matSize / 2, cudaMemcpyHostToDevice));
-  CUDA_ERROR_CHECK(cudaMemcpyAsync(data + matSize / 2, image + matSize / 2, sizeof(float2) * matSize / 2, cudaMemcpyHostToDevice));
-
-
-  FFT<SIZE, AXIS_Y, FORWARD>(data, size);
-  FFT<SIZE, AXIS_X, FORWARD>(data, size / 8);
-  FFT<SIZE, AXIS_X, FORWARD>(data + (size - size / 8) * size, size / 8);
+  //http://www.pgroup.com/lit/articles/insider/v3n1a4.htm
+  unsigned int eight = size / 8;
+  unsigned int eight7 = size - eight;
+  for (int i = 0; i < PNUM; i++) {
+    CUDA_ERROR_CHECK(cudaMemcpyAsync(data + BLOCK * i, image + BLOCK * i, matSize * sizeof(float2) / PNUM, cudaMemcpyHostToDevice, filterStream[i]));
+    FFT<SIZE, AXIS_X, FORWARD>(data + BLOCK * i, size / PNUM, filterStream[i]);
+    cudaMemsetAsync(data + eight + BLOCK * i, 0, sizeof(float2) * (eight7 - eight), filterStream[i]);
+  }
+  FFT<SIZE, AXIS_Y, FORWARD>(data, size / 8, filterStream[PNUM - 1]);
+  FFT<SIZE, AXIS_Y, FORWARD>(data + (size - size / 8), size / 8, filterStream[PNUM - 2]);
   Filter(data, size);
-  FFT<SIZE, AXIS_X, INVERSE>(data, size / 8);
-  FFT<SIZE, AXIS_X, INVERSE>(data + (size - size / 8) * size, size / 8); 
-  FFT<SIZE, AXIS_Y, INVERSE>(data, size);
+  FFT<SIZE, AXIS_Y, INVERSE>(data, size / 8, filterStream[PNUM - 1]);
+  FFT<SIZE, AXIS_Y, INVERSE>(data + (size - size / 8), size / 8, filterStream[PNUM - 2]);
+  for (int i = PNUM - 1; i >= 0; i--) {
+    FFT<SIZE, AXIS_X, INVERSE>(data + BLOCK * i, size / PNUM, filterStream[i]);
+    CUDA_ERROR_CHECK(cudaMemcpyAsync(image + BLOCK * i, data + BLOCK * i, sizeof(float2) * matSize / PNUM, cudaMemcpyDeviceToHost, filterStream[i]));
+  }
+  //CUDA_ERROR_CHECK(cudaMemcpyAsync(data, image, sizeof(float2) * matSize, cudaMemcpyHostToDevice));
+
+
+  //FFT<SIZE, AXIS_X, FORWARD>(data, size / 8);
+  //FFT<SIZE, AXIS_X, FORWARD>(data + (size - size / 8) * size, size / 8);
+  //FFT<SIZE, AXIS_X, INVERSE>(data, size / 8);
+  //FFT<SIZE, AXIS_X, INVERSE>(data + (size - size / 8) * size, size / 8); 
+  //FFT<SIZE, AXIS_Y, INVERSE>(data, size);
   //for (int i = 0; i < PNUM; i++) 
   //   CUDA_ERROR_CHECK(cudaMemcpyAsync(image + BLOCK * i, data + BLOCK * i, matSize * sizeof(float2) / PNUM, cudaMemcpyDeviceToHost));
-  CUDA_ERROR_CHECK(cudaMemcpyAsync(image, data, sizeof(float2) * matSize / 2, cudaMemcpyDeviceToHost));
-  CUDA_ERROR_CHECK(cudaMemcpyAsync(image + matSize / 2, data + matSize / 2, sizeof(float2) * matSize / 2, cudaMemcpyDeviceToHost));
+  //CUDA_ERROR_CHECK(cudaMemcpyAsync(image, data, sizeof(float2) * matSize / 2, cudaMemcpyDeviceToHost));
+  //CUDA_ERROR_CHECK(cudaMemcpyAsync(image + matSize / 2, data + matSize / 2, sizeof(float2) * matSize / 2, cudaMemcpyDeviceToHost));
 
 
   //---------------------------------------------------------------- 
@@ -549,7 +573,7 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   //----------------------------------------------------------------
 
   // Finish timimg for the execution 
-  CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
+  CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream[PNUM - 1]));
   CUDA_ERROR_CHECK(cudaEventSynchronize(stop));
   CUDA_ERROR_CHECK(cudaEventElapsedTime(&execution,start,stop));
 
@@ -564,9 +588,11 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   //CUDA_ERROR_CHECK(cudaEventElapsedTime(&transferUp,start,stop));
   
   // Synchronize the stream
-  CUDA_ERROR_CHECK(cudaStreamSynchronize(filterStream));
-  // Destroy the stream
-  CUDA_ERROR_CHECK(cudaStreamDestroy(filterStream));
+  for (int i = 0; i < PNUM; i++) {
+    CUDA_ERROR_CHECK(cudaStreamSynchronize(filterStream[i]));
+    // Destroy the stream
+    CUDA_ERROR_CHECK(cudaStreamDestroy(filterStream[i]));
+  }
   // Destroy the events
   CUDA_ERROR_CHECK(cudaEventDestroy(start));
   CUDA_ERROR_CHECK(cudaEventDestroy(stop));
