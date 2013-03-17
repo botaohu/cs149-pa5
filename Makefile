@@ -20,7 +20,7 @@ NVCCFLAGS = -arch=compute_20 -Xptxas "-v" -D SIZEX=$(SIZEX) -D SIZEY=$(SIZEY)
 ifeq ($(DEBUG),1)
 NVCCFLAGS += -g -G
 else
-NVCCFLAGS += 
+NVCCFLAGS += -O3 
 endif
 
 ifeq ($(shell uname), Darwin)
@@ -37,7 +37,7 @@ CFLAGS = -I $(CUDA_INC) -D SIZEX=$(SIZEX) -D SIZEY=$(SIZEY)
 ifeq ($(DEBUG),1)
 CFLAGS += -g
 else
-CFLAGS +=
+CFLAGS += -O3
 endif
 
 ifeq ($(shell uname), Darwin)

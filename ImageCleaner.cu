@@ -467,6 +467,9 @@ __host__ void Filter(float2 *work, int size) {
   CUDA_ERROR_CHECK(cudaMemset2D(work + eight * size, sizeof(float2) * size, 0, sizeof(float2) * size, eight7 - eight));
 }
 __host__ float filterImage(float2* image, int size_x, int size_y) {
+  #define PNUM  8
+  #define BLOCK (SIZE * SIZE / PNUM)
+ 
   // check that the sizes match up
   assert(size_x == SIZEX);
   assert(size_y == SIZEY);
@@ -482,25 +485,26 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   CUDA_ERROR_CHECK(cudaEventCreate(&stop));
 
   // Create a stream and initialize it
-  cudaStream_t filterStream;
-  CUDA_ERROR_CHECK(cudaStreamCreate(&filterStream));
+  cudaStream_t filterStream[PNUM];
+  for (int i = 0; i < PNUM; i++)
+    CUDA_ERROR_CHECK(cudaStreamCreate(&filterStream[i]));
 
   // Alloc space on the device
   float2 *data;
   CUDA_ERROR_CHECK(cudaMalloc((void**)&data, matSize * sizeof(float2)));
 
   // Start timing for transfer down
-  CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
+  //CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
   
   // Here is where we copy matrices down to the device 
  
   // Stop timing for transfer down
-  CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
-  CUDA_ERROR_CHECK(cudaEventSynchronize(stop));
-  CUDA_ERROR_CHECK(cudaEventElapsedTime(&transferDown,start,stop));
+  //CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
+  //CUDA_ERROR_CHECK(cudaEventSynchronize(stop));
+  //CUDA_ERROR_CHECK(cudaEventElapsedTime(&transferDown,start,stop));
 
   // Start timing for the execution
-  CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
+  CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream[0]));
 
   //----------------------------------------------------------------
   // TODO: YOU SHOULD PLACE ALL YOUR KERNEL EXECUTIONS
@@ -520,7 +524,13 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   // Also note that you pass the pointers to the device memory to the kernel call
   
   //precompute the bit reversal.
-  CUDA_ERROR_CHECK(cudaMemcpyAsync(data, image, matSize * sizeof(float2), cudaMemcpyHostToDevice));
+  for (int i = 0; i < PNUM; i++) 
+     CUDA_ERROR_CHECK(cudaMemcpyAsync(data + BLOCK * i, image + BLOCK * i, matSize * sizeof(float2) / PNUM, cudaMemcpyHostToDevice));
+  
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(data, image, sizeof(float2) * matSize / 2, cudaMemcpyHostToDevice));
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(data + matSize / 2, image + matSize / 2, sizeof(float2) * matSize / 2, cudaMemcpyHostToDevice));
+
+
   FFT<SIZE, AXIS_Y, FORWARD>(data, size);
   FFT<SIZE, AXIS_X, FORWARD>(data, size / 8);
   FFT<SIZE, AXIS_X, FORWARD>(data + (size - size / 8) * size, size / 8);
@@ -528,7 +538,11 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   FFT<SIZE, AXIS_X, INVERSE>(data, size / 8);
   FFT<SIZE, AXIS_X, INVERSE>(data + (size - size / 8) * size, size / 8); 
   FFT<SIZE, AXIS_Y, INVERSE>(data, size);
-  CUDA_ERROR_CHECK(cudaMemcpyAsync(image, data, sizeof(float2) * matSize, cudaMemcpyDeviceToHost));
+  //for (int i = 0; i < PNUM; i++) 
+  //   CUDA_ERROR_CHECK(cudaMemcpyAsync(image + BLOCK * i, data + BLOCK * i, matSize * sizeof(float2) / PNUM, cudaMemcpyDeviceToHost));
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(image, data, sizeof(float2) * matSize / 2, cudaMemcpyDeviceToHost));
+  CUDA_ERROR_CHECK(cudaMemcpyAsync(image + matSize / 2, data + matSize / 2, sizeof(float2) * matSize / 2, cudaMemcpyDeviceToHost));
+
 
   //---------------------------------------------------------------- 
   // END ADD KERNEL CALLS
@@ -540,14 +554,14 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   CUDA_ERROR_CHECK(cudaEventElapsedTime(&execution,start,stop));
 
   // Start timing for the transfer up
-  CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
+  //CUDA_ERROR_CHECK(cudaEventRecord(start,filterStream));
 
   // Here is where we copy matrices back from the device 
 
   // Finish timing for transfer up
-  CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
-  CUDA_ERROR_CHECK(cudaEventSynchronize(stop));
-  CUDA_ERROR_CHECK(cudaEventElapsedTime(&transferUp,start,stop));
+  //CUDA_ERROR_CHECK(cudaEventRecord(stop,filterStream));
+  //CUDA_ERROR_CHECK(cudaEventSynchronize(stop));
+  //CUDA_ERROR_CHECK(cudaEventElapsedTime(&transferUp,start,stop));
   
   // Synchronize the stream
   CUDA_ERROR_CHECK(cudaStreamSynchronize(filterStream));
