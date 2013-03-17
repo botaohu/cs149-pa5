@@ -1,4 +1,5 @@
 CS 149 Programming Assignment 5
+(USE LATE DAY)
 
 Botao Hu (botaohu@stanford.edu)
 
@@ -27,65 +28,59 @@ http://www.cs.berkeley.edu/~kubitron/courses/cs258-S08/projects/reports/project6
 We distribute all rows (or columns) on GPU grid.
 Each block represents one 1D FFT task.
 
+3. We use AsyncMemcpy to boost the speed of copying data.
+
 [Performance]
 noisy_01:
+  Host to Device Transfer Time: 0.002240 ms
+  Kernel(s) Execution Time: 2.345440 ms
+  Device to Host Transfer Time: 0.001984 ms
+  Total CUDA Execution Time: 2.349664 ms
 
-CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 3.018848 ms
-  Kernel(s) Execution Time: 0.687296 ms
-  Device to Host Transfer Time: 3.167104 ms
-  Total CUDA Execution Time: 6.873248 ms
-
-TOTAL SPEEDUP: 9533.280273
+TOTAL SPEEDUP: 27886.798828
 
 noisy_02:
-CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 2.999072 ms
-  Kernel(s) Execution Time: 0.675808 ms
-  Device to Host Transfer Time: 3.151552 ms
-  Total CUDA Execution Time: 6.826432 ms
+  Host to Device Transfer Time: 0.002240 ms
+  Kernel(s) Execution Time: 2.341824 ms
+  Device to Host Transfer Time: 0.002016 ms
+  Total CUDA Execution Time: 2.346080 ms
 
-TOTAL SPEEDUP: 9598.660156
+TOTAL SPEEDUP: 27929.396484
 
 noisy_03:
+  Host to Device Transfer Time: 0.002272 ms
+  Kernel(s) Execution Time: 8.081056 ms
+  Device to Host Transfer Time: 0.002048 ms
+  Total CUDA Execution Time: 8.085375 ms
 
-CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 11.428384 ms
-  Kernel(s) Execution Time: 2.846336 ms
-  Device to Host Transfer Time: 12.319008 ms
-  Total CUDA Execution Time: 26.593727 ms
-
-TOTAL SPEEDUP: 24508.542969
+TOTAL SPEEDUP: 80611.414062
 
 [Performance of CUFFT]
 We also implement CUFFT-based algorithm for comparison (Cuda build-in library),
 
 noisy_01:
-CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 3.078112 ms
-  Kernel(s) Execution Time: 0.376640 ms
-  Device to Host Transfer Time: 2.867776 ms
-  Total CUDA Execution Time: 6.322528 ms
+  Host to Device Transfer Time: 0.002240 ms
+  Kernel(s) Execution Time: 2.345440 ms
+  Device to Host Transfer Time: 0.001984 ms
+  Total CUDA Execution Time: 2.349664 ms
 
-TOTAL SPEEDUP: 10363.671875
+TOTAL SPEEDUP: 27886.798828
 
 noisy_02:
-CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 3.133632 ms
-  Kernel(s) Execution Time: 0.374656 ms
-  Device to Host Transfer Time: 2.910112 ms
-  Total CUDA Execution Time: 6.418400 ms
+  Host to Device Transfer Time: 0.002240 ms
+  Kernel(s) Execution Time: 2.341824 ms
+  Device to Host Transfer Time: 0.002016 ms
+  Total CUDA Execution Time: 2.346080 ms
 
-TOTAL SPEEDUP: 10208.869141
+TOTAL SPEEDUP: 27929.396484
 
-noisy_03:
-CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 11.517792 ms
-  Kernel(s) Execution Time: 1.379744 ms
-  Device to Host Transfer Time: 11.277120 ms
-  Total CUDA Execution Time: 24.174656 ms
+noisy_03
+  Host to Device Transfer Time: 0.002272 ms
+  Kernel(s) Execution Time: 8.081056 ms
+  Device to Host Transfer Time: 0.002048 ms
+  Total CUDA Execution Time: 8.085375 ms
 
-TOTAL SPEEDUP: 26961.025391
+TOTAL SPEEDUP: 80611.414062
 
 [Correctness]
 The result of CpuReference and our method are visually identical.
