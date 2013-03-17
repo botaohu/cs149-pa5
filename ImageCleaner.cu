@@ -519,7 +519,6 @@ __host__ float filterImage(float2* image, int size_x, int size_y) {
   //
   // Also note that you pass the pointers to the device memory to the kernel call
   
-  //precompute the bit reversal.
   CUDA_ERROR_CHECK(cudaMemcpyAsync(data, image, matSize * sizeof(float2), cudaMemcpyHostToDevice));
   FFT<SIZE, AXIS_Y, FORWARD>(data, size);
   FFT<SIZE, AXIS_X, FORWARD>(data, size / 8);

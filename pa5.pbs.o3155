@@ -4,27 +4,23 @@ nvcc -arch=compute_20 -Xptxas "-v" -D SIZEX=512 -D SIZEY=512  -code=sm_20 -c -o 
 g++ -I /usr/local/cuda/include -D SIZEX=512 -D SIZEY=512  -c -o JPEGWriter.o JPEGWriter.cc
 g++ -I /usr/local/cuda/include -D SIZEX=512 -D SIZEY=512  -c -o CpuReference.o CpuReference.cc
 nvcc -arch=compute_20 -Xptxas "-v" -D SIZEX=512 -D SIZEY=512  -code=sm_20 -L /usr/local/cuda/lib64 -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o -lcudart -ljpeg
-Selecting GPU 0 of type Tesla M2050
-
 CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 3.018848 ms
-  Kernel(s) Execution Time: 0.687296 ms
-  Device to Host Transfer Time: 3.167104 ms
-  Total CUDA Execution Time: 6.873248 ms
+  Host to Device Transfer Time: 0.002240 ms
+  Kernel(s) Execution Time: 2.345440 ms
+  Device to Host Transfer Time: 0.001984 ms
+  Total CUDA Execution Time: 2.349664 ms
 
-TOTAL SPEEDUP: 9533.280273
+TOTAL SPEEDUP: 27886.798828
 
 Writing out CUDA generated image to images/noisy_01_out.jpg
 
-Selecting GPU 0 of type Tesla M2050
-
 CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 2.999072 ms
-  Kernel(s) Execution Time: 0.675808 ms
-  Device to Host Transfer Time: 3.151552 ms
-  Total CUDA Execution Time: 6.826432 ms
+  Host to Device Transfer Time: 0.002240 ms
+  Kernel(s) Execution Time: 2.341824 ms
+  Device to Host Transfer Time: 0.002016 ms
+  Total CUDA Execution Time: 2.346080 ms
 
-TOTAL SPEEDUP: 9598.660156
+TOTAL SPEEDUP: 27929.396484
 
 Writing out CUDA generated image to images/noisy_02_out.jpg
 
@@ -34,15 +30,13 @@ nvcc -arch=compute_20 -Xptxas "-v" -D SIZEX=1024 -D SIZEY=1024  -code=sm_20 -c -
 g++ -I /usr/local/cuda/include -D SIZEX=1024 -D SIZEY=1024  -c -o JPEGWriter.o JPEGWriter.cc
 g++ -I /usr/local/cuda/include -D SIZEX=1024 -D SIZEY=1024  -c -o CpuReference.o CpuReference.cc
 nvcc -arch=compute_20 -Xptxas "-v" -D SIZEX=1024 -D SIZEY=1024  -code=sm_20 -L /usr/local/cuda/lib64 -o ImageCleaner main.o ImageCleaner.o JPEGWriter.o CpuReference.o -lcudart -ljpeg
-Selecting GPU 0 of type Tesla M2050
-
 CUDA IMPLEMENTATION STATISTICS:
-  Host to Device Transfer Time: 11.428384 ms
-  Kernel(s) Execution Time: 2.846336 ms
-  Device to Host Transfer Time: 12.319008 ms
-  Total CUDA Execution Time: 26.593727 ms
+  Host to Device Transfer Time: 0.002272 ms
+  Kernel(s) Execution Time: 8.081056 ms
+  Device to Host Transfer Time: 0.002048 ms
+  Total CUDA Execution Time: 8.085375 ms
 
-TOTAL SPEEDUP: 24508.542969
+TOTAL SPEEDUP: 80611.414062
 
 Writing out CUDA generated image to images/noisy_03_out.jpg
 
